@@ -12,6 +12,9 @@ repositories {
 
     maven { url = uri("https://central.sonatype.com/repository/maven-snapshots/") }
 
+    // Temporary: test PDFBox 3.0.9-SNAPSHOT (PDFBOX-6214 AWT fix) under GraalVM CE native image
+    maven { url = uri("https://repository.apache.org/content/groups/snapshots/") }
+
     // Required for https://github.com/sialcasa/mvvmFX
     maven { url = uri("https://jitpack.io") }
 

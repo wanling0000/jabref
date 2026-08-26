@@ -19,7 +19,7 @@ val javafx = providers.gradleProperty("javafxVersion").getOrElse(javafxDefault)
 
 val lucene = "10.5.1"
 
-val pdfbox = "3.0.8"
+val pdfbox = "3.0.9-SNAPSHOT"
 
 // Pinned instead of the dev.jbang plugin default "latest": a PATH miss would otherwise fetch
 // https://www.jbang.dev/releases/latest/download/version.txt (10 s timeout, no retries).
