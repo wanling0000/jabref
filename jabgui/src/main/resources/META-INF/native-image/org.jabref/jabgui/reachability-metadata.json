@@ -847,6 +847,28 @@
       ]
     },
     {
+      "type": "java.lang.System",
+      "jniAccessible": true,
+      "methods": [
+        {
+          "name": "load",
+          "parameterTypes": [
+            "java.lang.String"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "java.lang.Thread",
+      "jniAccessible": true,
+      "methods": [
+        {
+          "name": "yield",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
       "type": "org.jabref.gui.clipboard.JabRefClipboardData",
       "allDeclaredConstructors": true,
       "allDeclaredFields": true,
