@@ -869,6 +869,30 @@
       ]
     },
     {
+      "type": "sun.java2d.Disposer",
+      "jniAccessible": true,
+      "methods": [
+        {
+          "name": "addRecord",
+          "parameterTypes": [
+            "java.lang.Object",
+            "long",
+            "long"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "sun.awt.X11.XRootWindow",
+      "jniAccessible": true,
+      "methods": [
+        {
+          "name": "getXRootWindow",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
       "type": "org.jabref.gui.clipboard.JabRefClipboardData",
       "allDeclaredConstructors": true,
       "allDeclaredFields": true,
