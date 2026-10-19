@@ -893,6 +893,24 @@
       ]
     },
     {
+      "type": "java.rmi.MarshalledObject",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "java.lang.Object"
+          ]
+        },
+        {
+          "name": "get",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "java.rmi.Remote"
+    },
+    {
       "type": "org.jabref.gui.clipboard.JabRefClipboardData",
       "allDeclaredConstructors": true,
       "allDeclaredFields": true,
@@ -1043,6 +1061,10 @@
     },
     {
       "bundle": "controlsfx"
+    },
+    {
+      "module": "java.datatransfer",
+      "glob": "sun/datatransfer/resources/flavormap.properties"
     },
     {
       "bundle": "sun.awt.resources.awt"
