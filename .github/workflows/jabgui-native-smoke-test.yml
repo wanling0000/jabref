@@ -41,7 +41,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON((github.event_name == 'pull_request' || github.event_name == 'merge_group') && '["ubuntu-22.04"]' || '["ubuntu-22.04", "macos-15"]') }}
+        os: ${{ fromJSON((github.event_name == 'pull_request' || github.event_name == 'merge_group') && '["ubuntu-22.04", "macos-15"]' || '["ubuntu-22.04", "macos-15"]') }}
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.os }} JabGui native smoke test
     timeout-minutes: 60
