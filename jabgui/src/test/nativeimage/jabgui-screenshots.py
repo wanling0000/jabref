@@ -63,7 +63,8 @@ def open_about(screen: Screen) -> None:
     menu_bar = Region(0, 0, screen.getW(), 40)
     help_menu = click_text(screen, menu_bar, "Help")
     time.sleep(1)
-    dropdown = Region(max(0, help_menu.getX() - 300), help_menu.getY(), 500, 400)
+    # Only the dropdown itself: with the entry table next to it, OCR merges both into one line
+    dropdown = Region(max(0, help_menu.getX() - 20), help_menu.getY() + help_menu.getH(), 220, 320)
     click_text(screen, dropdown, "About JabRef")
 
 
