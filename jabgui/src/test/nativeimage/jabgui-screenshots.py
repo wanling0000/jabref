@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Callable
 
-from oculix import Key, Screen
+from oculix import OCR, Key, Region, Screen
 
 # Time for a dialog or view to appear and finish rendering
 SETTLE_SECONDS = 3
@@ -46,9 +46,14 @@ def open_cleanup(screen: Screen) -> None:
     press(screen, Key.ALT, Key.F8)
 
 
-def click_text(screen: Screen, text: str) -> None:
-    # findText is SikuliX's OCR search; the Python wrapper does not list it, so call it directly
-    screen.click(screen._call("findText", text))
+def click_text(screen: Screen, text: str, timeout: float = 10.0) -> None:
+    # existsText is SikuliX's OCR search; the Python wrapper does not list it, so call it directly.
+    # It waits up to timeout and returns None instead of throwing, so we can report what OCR saw.
+    match = screen._call("existsText", text, timeout)
+    if match is None:
+        seen = OCR.readText(Region(0, 0, screen.getW(), 200)._remote)
+        raise RuntimeError(f"text {text!r} not found on screen, OCR read near the top: {seen!r}")
+    screen.click(match)
 
 
 def open_about(screen: Screen) -> None:
@@ -92,6 +97,8 @@ def main() -> int:
             time.sleep(1)
         except Exception as error:  # noqa: BLE001 (OculiX reports Java exceptions as plain exceptions)
             print(f"could not take {name}: {error}", file=sys.stderr)
+            screen.capture().save(str(args.output), f"{name}-failed")
+            screen.type(Key.ESC)
             failed.append(name)
 
     if failed:
