@@ -59,13 +59,14 @@ def click_text(screen: Screen, area: Region, text: str, timeout: float = 10.0) -
 
 
 def open_about(screen: Screen) -> None:
-    # No shortcut and no mnemonic for About: find the menu entries by their text
+    # No shortcut and no mnemonic for About: open the Help menu by its text (OCR).
+    # About JabRef is the last entry; Up selects the last entry of an opened menu.
+    # OCR reads "About JabRef" in the dropdown on CI, but existsText does not match the two words there.
     menu_bar = Region(0, 0, screen.getW(), 40)
-    help_menu = click_text(screen, menu_bar, "Help")
+    click_text(screen, menu_bar, "Help")
     time.sleep(1)
-    # Only the dropdown itself: with the entry table next to it, OCR merges both into one line
-    dropdown = Region(max(0, help_menu.getX() - 20), help_menu.getY() + help_menu.getH(), 220, 320)
-    click_text(screen, dropdown, "About JabRef")
+    screen.type(Key.UP)
+    screen.type(Key.ENTER)
 
 
 def close_dialog(screen: Screen) -> None:
