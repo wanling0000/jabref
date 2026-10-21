@@ -46,21 +46,25 @@ def open_cleanup(screen: Screen) -> None:
     press(screen, Key.ALT, Key.F8)
 
 
-def click_text(screen: Screen, text: str, timeout: float = 10.0) -> None:
+def click_text(screen: Screen, area: Region, text: str, timeout: float = 10.0) -> object:
     # existsText is SikuliX's OCR search; the Python wrapper does not list it, so call it directly.
-    # It waits up to timeout and returns None instead of throwing, so we can report what OCR saw.
-    match = screen._call("existsText", text, timeout)
+    # Searching a small area: on the whole screen OCR misses small menu labels it reads fine in a strip.
+    # existsText waits up to timeout and returns None instead of throwing, so we can report what OCR saw.
+    match = area._call("existsText", text, timeout)
     if match is None:
-        seen = OCR.readText(Region(0, 0, screen.getW(), 200)._remote)
-        raise RuntimeError(f"text {text!r} not found on screen, OCR read near the top: {seen!r}")
+        seen = OCR.readText(area._remote)
+        raise RuntimeError(f"text {text!r} not found, OCR read in the search area: {seen!r}")
     screen.click(match)
+    return match
 
 
 def open_about(screen: Screen) -> None:
     # No shortcut and no mnemonic for About: find the menu entries by their text
-    click_text(screen, "Help")
+    menu_bar = Region(0, 0, screen.getW(), 40)
+    help_menu = click_text(screen, menu_bar, "Help")
     time.sleep(1)
-    click_text(screen, "About JabRef")
+    dropdown = Region(max(0, help_menu.getX() - 300), help_menu.getY(), 500, 400)
+    click_text(screen, dropdown, "About JabRef")
 
 
 def close_dialog(screen: Screen) -> None:
