@@ -46,11 +46,16 @@ def open_cleanup(screen: Screen) -> None:
     press(screen, Key.ALT, Key.F8)
 
 
+def click_text(screen: Screen, text: str) -> None:
+    # findText is SikuliX's OCR search; the Python wrapper does not list it, so call it directly
+    screen.click(screen._call("findText", text))
+
+
 def open_about(screen: Screen) -> None:
-    # No shortcut for About: find the menu entries by their text (OCR)
-    screen.click("Help")
+    # No shortcut and no mnemonic for About: find the menu entries by their text
+    click_text(screen, "Help")
     time.sleep(1)
-    screen.click("About JabRef")
+    click_text(screen, "About JabRef")
 
 
 def close_dialog(screen: Screen) -> None:
