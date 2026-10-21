@@ -100,6 +100,43 @@ jobs:
             exit 1
           fi
 
+      # OculiX downloads its engine jar (~160 MB) to ~/.oculix on first use
+      - name: Cache OculiX engine
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.oculix
+          key: oculix-1.0.0
+
+      - name: Install OculiX
+        run: pip install oculix==1.0.0
+
+      # Automated screenshots of the main views (JabRef/jabref#6089), driven by OculiX like a user
+      - name: Take screenshots
+        run: |
+          out="$RUNNER_TEMP/screenshots"
+          mkdir -p "$out" "$RUNNER_TEMP/jabref-home-screenshots"
+          cp jablib/src/test/resources/testbib/complex.bib "$out/complex.bib"
+
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" \
+            bash -c '
+              HOME="$4" "$0" -Dprism.order=sw "$1" > "$2/jabref.log" 2>&1 &
+              pid=$!
+              sleep 60
+              python3 "$3" "$2"
+              status=$?
+              kill "$pid"; sleep 5; kill -9 "$pid" 2>/dev/null || true
+              exit $status
+            ' "$GITHUB_WORKSPACE/jabgui/build/native/nativeCompile/jabref" "$out/complex.bib" "$out" \
+              "$GITHUB_WORKSPACE/jabgui/src/test/nativeimage/jabgui-screenshots.py" "$RUNNER_TEMP/jabref-home-screenshots"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: jabgui-screenshots
+          path: ${{ runner.temp }}/screenshots/
+          if-no-files-found: warn
+
       - name: Upload screenshot and log
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
