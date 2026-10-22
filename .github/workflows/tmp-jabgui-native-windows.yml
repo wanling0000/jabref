@@ -1,0 +1,83 @@
+name: TMP JabGui Native Windows Debug
+
+on:
+  pull_request:
+    paths:
+      - 'jabgui/**'
+      - 'jablib/**'
+      - 'build-logic/**'
+      - 'versions/**'
+      - '.github/workflows/tmp-jabgui-native-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-native:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          submodules: 'true'
+          show-progress: 'false'
+
+      - uses: ./.github/actions/setup-gradle
+
+      - name: Set up GraalVM CE 25.3
+        uses: graalvm/setup-graalvm@27b360dbb857524eaf0b4c4cef364d38e5b4f173 # v1.6.7
+        with:
+          distribution: 'graalvm-community'
+          version: '25.3'
+          java-version: '25'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build JabGui native binary
+        run: gradle :jabgui:nativeCompile
+
+      # jabref.exe is a GUI-subsystem binary (StaticFX links with /SUBSYSTEM:WINDOWS),
+      # so start it with Start-Process to get its real exit code and redirected output
+      - name: Start JabGui and take a screenshot
+        shell: pwsh
+        run: |
+          $out = "$env:RUNNER_TEMP\smoke"
+          New-Item -ItemType Directory -Force $out | Out-Null
+          $exe = "$env:GITHUB_WORKSPACE\jabgui\build\native\nativeCompile\jabref.exe"
+          $p = Start-Process -FilePath $exe -ArgumentList '--debug' `
+            -RedirectStandardOutput "$out\stdout.txt" -RedirectStandardError "$out\stderr.txt" -PassThru
+          $null = $p.Handle  # needed so ExitCode is available later
+          $exited = $p.WaitForExit(60000)
+
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bmp.Save("$out\screenshot.png")
+
+          if ($exited) {
+            "JabRef exited early, exit code: $($p.ExitCode) ({0:X8})" -f $p.ExitCode
+          } else {
+            "JabRef still running after 60s"
+            Stop-Process -Id $p.Id -Force
+          }
+          "== stdout =="; Get-Content "$out\stdout.txt"
+          "== stderr =="; Get-Content "$out\stderr.txt"
+
+          $logs = "$env:LOCALAPPDATA\org.jabref\jabref\logs"
+          if (Test-Path $logs) {
+            Copy-Item -Recurse $logs "$out\logs"
+            Get-ChildItem -Recurse "$out\logs" -Filter *.txt | ForEach-Object { "== $($_.FullName) =="; Get-Content $_.FullName }
+          } else {
+            "No log directory at $logs"
+          }
+
+      - name: Upload screenshot and logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: jabgui-native-windows-debug
+          path: ${{ runner.temp }}/smoke/
+          if-no-files-found: warn
