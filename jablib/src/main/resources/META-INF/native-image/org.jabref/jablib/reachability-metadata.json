@@ -158,7 +158,43 @@
       ]
     },
     {
+      "type": "com.github.javakeyring.internal.freedesktop.FreedesktopKeyringBackend",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "com.github.javakeyring.internal.kde.KWalletBackend",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
       "type": "com.github.javakeyring.internal.osx.ModernOsxKeychainBackend",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "com.github.javakeyring.internal.osx.OsxKeychainBackend",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "com.github.javakeyring.internal.windows.WinCredentialStoreBackend",
       "methods": [
         {
           "name": "<init>",
@@ -391,6 +427,64 @@
     {
       "type": "java.time.Ser",
       "serializable": true
+    },
+    {
+      "type": {
+        "proxy": [
+          "com.sun.jna.platform.win32.Shell32"
+        ]
+      }
+    },
+    {
+      "type": {
+        "proxy": [
+          "com.sun.jna.platform.win32.Ole32"
+        ]
+      }
+    },
+    {
+      "type": "com.sun.jna.ptr.PointerByReference",
+      "allPublicConstructors": true
+    },
+    {
+      "type": "com.sun.jna.platform.win32.WinNT$HANDLE",
+      "allPublicConstructors": true
+    },
+    {
+      "type": "com.sun.jna.platform.win32.WinNT$HRESULT",
+      "allPublicConstructors": true
+    },
+    {
+      "type": "com.sun.jna.platform.win32.WinDef$DWORD",
+      "allPublicConstructors": true
+    },
+    {
+      "type": "com.sun.jna.platform.win32.WinDef$HWND",
+      "allPublicConstructors": true
+    },
+    {
+      "type": {
+        "proxy": [
+          "com.github.javakeyring.internal.windows.Advapi32"
+        ]
+      }
+    },
+    {
+      "type": {
+        "proxy": [
+          "com.github.javakeyring.internal.windows.Kernel32"
+        ]
+      }
+    },
+    {
+      "type": "com.github.javakeyring.internal.windows.CREDENTIAL",
+      "allDeclaredFields": true,
+      "allPublicConstructors": true
+    },
+    {
+      "type": "com.sun.jna.platform.win32.WinBase$FILETIME",
+      "allDeclaredFields": true,
+      "allPublicConstructors": true
     }
   ],
   "resources": [
