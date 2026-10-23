@@ -45,8 +45,12 @@ jobs:
         run: |
           $out = "$env:RUNNER_TEMP\smoke"
           New-Item -ItemType Directory -Force $out | Out-Null
+          # Open a test library, like the Linux smoke test; it lives outside the uploaded folder
+          $lib = "$env:RUNNER_TEMP\testlib\complex.bib"
+          New-Item -ItemType Directory -Force (Split-Path $lib) | Out-Null
+          Copy-Item "$env:GITHUB_WORKSPACE\jablib\src\test\resources\testbib\complex.bib" $lib
           $exe = "$env:GITHUB_WORKSPACE\jabgui\build\native\nativeCompile\jabref.exe"
-          $p = Start-Process -FilePath $exe -ArgumentList '--debug' `
+          $p = Start-Process -FilePath $exe -ArgumentList '--debug', $lib `
             -RedirectStandardOutput "$out\stdout.txt" -RedirectStandardError "$out\stderr.txt" -PassThru
           $null = $p.Handle  # needed so ExitCode is available later
           $exited = $p.WaitForExit(60000)
