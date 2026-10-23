@@ -169,3 +169,130 @@ jobs:
           name: jabgui-native-${{ matrix.os }}
           path: jabgui/build/native/nativeCompile/
           if-no-files-found: error
+
+  # Same steps as above. The Windows runner has a real desktop, so no Xvfb and no window manager.
+  # jabref.exe is a GUI-subsystem binary (StaticFX links it with /SUBSYSTEM:WINDOWS): a plain redirect
+  # does not capture its output, so the runs use Start-Process.
+  windows-native-smoke-test:
+    runs-on: windows-latest
+    name: windows-latest JabGui native smoke test
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          submodules: 'true'
+          show-progress: 'false'
+
+      - uses: ./.github/actions/setup-gradle
+
+      - name: Set up GraalVM CE 25.3
+        uses: graalvm/setup-graalvm@27b360dbb857524eaf0b4c4cef364d38e5b4f173 # v1.6.7
+        with:
+          distribution: 'graalvm-community'
+          version: '25.3'
+          java-version: '25'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build JabGui native binary
+        run: gradle :jabgui:nativeCompile
+
+      - name: Prepare smoke test
+        run: |
+          # The test library lives outside the uploaded folders
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP\smoke", "$env:RUNNER_TEMP\testlib" | Out-Null
+          Copy-Item jablib\src\test\resources\testbib\complex.bib "$env:RUNNER_TEMP\testlib\complex.bib"
+
+      # Fresh runner: first launch, no preferences, no keyring entries
+      - name: Start JabGui and take a screenshot
+        run: |
+          $out = "$env:RUNNER_TEMP\smoke"
+          $exe = "$env:GITHUB_WORKSPACE\jabgui\build\native\nativeCompile\jabref.exe"
+          $p = Start-Process -FilePath $exe -ArgumentList "$env:RUNNER_TEMP\testlib\complex.bib" `
+            -RedirectStandardOutput "$out\stdout.txt" -RedirectStandardError "$out\stderr.txt" -PassThru
+          $null = $p.Handle  # keeps ExitCode readable after the process has ended
+          $exited = $p.WaitForExit(60000)
+
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
+          [System.Drawing.Graphics]::FromImage($bitmap).CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+          $bitmap.Save("$out\screenshot.png")
+
+          if (-not $exited) {
+            Stop-Process -Id $p.Id -Force
+            Start-Sleep -Seconds 2
+          }
+          Get-Content "$out\stdout.txt", "$out\stderr.txt" | Set-Content "$out\jabref.log"
+          if ($exited) {
+            "JabRef exited before the screenshot, exit code $($p.ExitCode)"
+            exit 1
+          }
+
+      - name: Check JabGui log
+        shell: bash
+        run: |
+          log="$RUNNER_TEMP/smoke/jabref.log"
+          cat "$log"
+          grep -q "Starting JabRef" "$log" || { echo "JabRef did not start"; exit 1; }
+          if grep -E "^ERROR:|NoClassDefFoundError|NoSuchMethodError|UnsatisfiedLinkError|MissingReflectionRegistrationError|MissingJNIRegistrationError|MissingResourceRegistrationError|Fatal error" "$log"; then
+            echo "Found errors in the JabRef log"
+            exit 1
+          fi
+
+      # OculiX downloads its engine jar (~160 MB) to ~/.oculix on first use
+      - name: Cache OculiX engine
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.oculix
+          key: oculix-1.0.0-windows
+
+      - name: Install OculiX
+        run: pip install oculix==1.0.0
+
+      - name: Take screenshots
+        run: |
+          $out = "$env:RUNNER_TEMP\screenshots"
+          New-Item -ItemType Directory -Force $out | Out-Null
+          # Fresh preferences, like the separate HOME on Linux
+          Remove-Item -Recurse -Force HKCU:\Software\JavaSoft\Prefs\org\jabref -ErrorAction SilentlyContinue
+
+          $exe = "$env:GITHUB_WORKSPACE\jabgui\build\native\nativeCompile\jabref.exe"
+          $p = Start-Process -FilePath $exe -ArgumentList "$env:RUNNER_TEMP\testlib\complex.bib" `
+            -RedirectStandardOutput "$out\stdout.txt" -RedirectStandardError "$out\stderr.txt" -PassThru
+          Start-Sleep -Seconds 60
+          python jabgui\src\test\nativeimage\jabgui-screenshots.py $out
+          $status = $LASTEXITCODE
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+          Get-Content "$out\stdout.txt", "$out\stderr.txt" | Set-Content "$out\jabref.log"
+          Remove-Item "$out\stdout.txt", "$out\stderr.txt"
+          exit $status
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: jabgui-screenshots-windows-latest
+          path: ${{ runner.temp }}/screenshots/
+          if-no-files-found: warn
+
+      - name: Upload smoke test screenshot and log
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: jabgui-native-smoke-test-windows-latest
+          path: ${{ runner.temp }}/smoke/
+          if-no-files-found: warn
+
+      - name: Upload JabGui native binary
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload-as-artifact }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: jabgui-native-windows-latest
+          path: jabgui/build/native/nativeCompile/
+          if-no-files-found: error
