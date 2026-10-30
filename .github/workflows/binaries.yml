@@ -506,22 +506,13 @@ jobs:
 
           # jabgui native is built for Linux (x64, arm64) and Windows (x64).
           # No macOS yet: native-image peaks at about 8.7 GB, the standard macOS arm runner has 7 GB.
+          # TMP: macOS only, to try Christoph's low-memory build
           JABGUI_NATIVE_MATRIX_JSON='{
             "include": [
               {
-                "os": "ubuntu-22.04",
-                "displayName": "linux-amd64",
-                "archiveNative": "tar -c -C jabgui/build/native jabgui | gzip > jabgui/build/native-dist/jabgui-native_linux.tar.gz"
-              },
-              {
-                "os": "ubuntu-22.04-arm",
-                "displayName": "linux-arm",
-                "archiveNative": "tar -c -C jabgui/build/native jabgui | gzip > jabgui/build/native-dist/jabgui-native_linux_arm64.tar.gz"
-              },
-              {
-                "os": "windows-latest",
-                "displayName": "windows-amd64",
-                "archiveNative": "7z a -r jabgui/build/native-dist/jabgui-native_windows.zip ./jabgui/build/native/jabgui"
+                "os": "macos-15",
+                "displayName": "macOS-silicon",
+                "archiveNative": "ditto -c -k --keepParent jabgui/build/native/jabgui jabgui/build/native-dist/jabgui-native_macos-silicon.zip"
               }
             ]
           }'
@@ -1174,7 +1165,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.displayName }} jabgui native binary
     # The build takes 15 to 25 minutes; on a runner that is short of memory it would otherwise hang for hours
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - name: Skip native binary build because it is not needed for this event
         if: needs.conditions.outputs.should-build != 'true'
@@ -1204,11 +1195,25 @@ jobs:
         if: ${{ needs.conditions.outputs.should-build == 'true' && runner.os == 'Linux' }}
         run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libxtst-dev libxxf86vm-dev libgl-dev xvfb openbox imagemagick
       - name: Build JabGui native binary
-        if: needs.conditions.outputs.should-build == 'true'
+        if: ${{ needs.conditions.outputs.should-build == 'true' && runner.os != 'macOS' }}
         run: gradle :jabgui:nativeCompile
         env:
           VERSION: ${{ needs.pre-build.outputs.AssemblySemVer }}
           VERSION_INFO: ${{ needs.pre-build.outputs.InformationalVersion }}
+      # TMP: the macOS arm runner has 7 GB. Compile the Java code first, stop that Gradle daemon (up to 6 GB heap),
+      # then run nativeCompile with a small daemon so native-image gets most of the memory.
+      - name: Build JabGui native binary (macOS, low memory)
+        if: ${{ needs.conditions.outputs.should-build == 'true' && runner.os == 'macOS' }}
+        run: |
+          sysctl hw.memsize
+          gradle :jabgui:installDist
+          gradle --stop
+          vm_stat | head -6
+          gradle :jabgui:nativeCompile -Dorg.gradle.jvmargs=-Xmx1g
+        env:
+          VERSION: ${{ needs.pre-build.outputs.AssemblySemVer }}
+          VERSION_INFO: ${{ needs.pre-build.outputs.InformationalVersion }}
+          NATIVE_IMAGE_OPTIONS: -J-Xmx6500m
 
       # Smoke test: start the binary with a test library, keep it running for a minute, take a screenshot and check the log
       - name: Prepare JabGui smoke test
@@ -1235,6 +1240,18 @@ jobs:
             fi
             kill "$pid"
           '
+      - name: Run JabGui smoke test (macOS)
+        if: ${{ needs.conditions.outputs.should-build == 'true' && runner.os == 'macOS' }}
+        run: |
+          jabgui/build/native/nativeCompile/jabref "$RUNNER_TEMP/testlib/complex.bib" > "$RUNNER_TEMP/smoke/jabref.log" 2>&1 &
+          pid=$!
+          sleep 60
+          screencapture -x "$RUNNER_TEMP/smoke/screenshot.png"
+          if ! kill -0 "$pid" 2>/dev/null; then
+            echo "JabRef exited before the screenshot"
+            exit 1
+          fi
+          kill "$pid"
       # jabref.exe is a GUI-subsystem binary (StaticFX links it with /SUBSYSTEM:WINDOWS):
       # a plain redirect does not capture its output, so the run uses Start-Process
       - name: Run JabGui smoke test (Windows)
