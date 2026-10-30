@@ -626,6 +626,8 @@ jobs:
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
 
   build:
+    # TMP: only run jabgui-native on the fork
+    if: false
     needs: [ compute-matrix, conditions, disk-space-check, flatpak-channel, pre-build ]
     strategy:
       fail-fast: false
@@ -1052,6 +1054,8 @@ jobs:
             jrrsync@build-upload.jabref.org:/var/www/builds.jabref.org/www/${{ needs.pre-build.outputs.branch }}/${{ matrix.displayName }}/
 
   jabkit-native:
+    # TMP: only run jabgui-native on the fork
+    if: false
     needs: [ compute-matrix, conditions, disk-space-check, pre-build ]
     strategy:
       fail-fast: false
