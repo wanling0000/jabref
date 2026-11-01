@@ -506,13 +506,20 @@ jobs:
 
           # jabgui native is built for Linux (x64, arm64) and Windows (x64).
           # No macOS yet: native-image peaks at about 8.7 GB, the standard macOS arm runner has 7 GB.
-          # TMP: macOS only, to try Christoph's low-memory build
+          # TMP: macOS only. Silicon (7 GB) uses the low-memory build, Intel (14 GB) the normal build.
           JABGUI_NATIVE_MATRIX_JSON='{
             "include": [
               {
                 "os": "macos-15",
                 "displayName": "macOS-silicon",
+                "lowMemory": true,
                 "archiveNative": "ditto -c -k --keepParent jabgui/build/native/jabgui jabgui/build/native-dist/jabgui-native_macos-silicon.zip"
+              },
+              {
+                "os": "macos-15-intel",
+                "displayName": "macOS-intel",
+                "lowMemory": false,
+                "archiveNative": "ditto -c -k --keepParent jabgui/build/native/jabgui jabgui/build/native-dist/jabgui-native_macos-intel.zip"
               }
             ]
           }'
@@ -1165,7 +1172,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.displayName }} jabgui native binary
     # The build takes 15 to 25 minutes; on a runner that is short of memory it would otherwise hang for hours
-    timeout-minutes: 120
+    # TMP: 360 (the GitHub maximum) to see whether the low-memory macOS build finishes at all
+    timeout-minutes: 360
     steps:
       - name: Skip native binary build because it is not needed for this event
         if: needs.conditions.outputs.should-build != 'true'
@@ -1195,7 +1203,7 @@ jobs:
         if: ${{ needs.conditions.outputs.should-build == 'true' && runner.os == 'Linux' }}
         run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libxtst-dev libxxf86vm-dev libgl-dev xvfb openbox imagemagick
       - name: Build JabGui native binary
-        if: ${{ needs.conditions.outputs.should-build == 'true' && runner.os != 'macOS' }}
+        if: ${{ needs.conditions.outputs.should-build == 'true' && !matrix.lowMemory }}
         run: gradle :jabgui:nativeCompile
         env:
           VERSION: ${{ needs.pre-build.outputs.AssemblySemVer }}
@@ -1203,7 +1211,7 @@ jobs:
       # TMP: the macOS arm runner has 7 GB. Compile the Java code first, stop that Gradle daemon (up to 6 GB heap),
       # then run nativeCompile with a small daemon so native-image gets most of the memory.
       - name: Build JabGui native binary (macOS, low memory)
-        if: ${{ needs.conditions.outputs.should-build == 'true' && runner.os == 'macOS' }}
+        if: ${{ needs.conditions.outputs.should-build == 'true' && matrix.lowMemory }}
         run: |
           sysctl hw.memsize
           gradle :jabgui:installDist
