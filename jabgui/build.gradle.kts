@@ -434,7 +434,7 @@ dependencies {
 }
 
 // TMP experiment: leave the AI libraries out of the runtime classpath to measure their native-image cost
-configurations.runtimeClasspath {
+configurations.matching { it.name == "runtimeClasspath" || it.name == "nativeImageClasspath" }.configureEach {
     exclude(group = "ai.djl", module = "api")
     exclude(group = "ai.djl.pytorch", module = "pytorch-engine")
     exclude(group = "ai.djl.pytorch", module = "pytorch-model-zoo")
