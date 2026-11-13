@@ -19,6 +19,11 @@ on:
       - reopened
       - labeled
   merge_group:
+  # Nightly build of the jabgui native binary for macOS (see compute-matrix)
+  schedule:
+    # Every day at 02:17 UTC. Not at the full hour: GitHub delays or drops scheduled runs under the high load at the
+    # start of every hour, see https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule
+    - cron: '17 2 * * *'
   workflow_dispatch:
     inputs:
       jvmDistribution:
@@ -320,6 +325,13 @@ jobs:
             exit 0
           fi;
 
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "☁️ Nightly build – will upload"
+            echo "☁️ Nightly build – will upload" >> $GITHUB_STEP_SUMMARY
+            echo "upload-to-builds-jabref-org=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "☁️? Dispatch event – will upload: ${{ github.event.inputs.upload || 'false' }}"
             echo "☁️= Dispatch event – will upload: ${{ github.event.inputs.upload || 'false' }}" >> $GITHUB_STEP_SUMMARY
@@ -504,9 +516,9 @@ jobs:
 
           echo "jabkit-native-matrix=$NATIVE_MATRIX_JSON" >> "$GITHUB_OUTPUT"
 
-          # jabgui native is built for Linux (x64, arm64) and Windows (x64).
-          # No macOS yet: native-image peaks at about 8.7 GB, the standard macOS arm runner has 7 GB.
-          # TMP: macOS only. Silicon (7 GB) uses the low-memory build, Intel (14 GB) the normal build.
+          # jabgui native is built for Linux (x64, arm64) and Windows (x64) on every build.
+          # macOS silicon is built only nightly and on manual dispatch: on the 7 GB macOS runner, native-image
+          # takes 1 to 2 hours, and the next push to main would cancel such a long build.
           JABGUI_NATIVE_MATRIX_JSON='{
             "include": [
               {
@@ -516,14 +528,34 @@ jobs:
                 "archiveNative": "ditto -c -k --keepParent jabgui/build/native/jabgui jabgui/build/native-dist/jabgui-native_macos-silicon.zip"
               },
               {
-                "os": "macos-15-intel",
-                "displayName": "macOS-intel",
-                "lowMemory": false,
-                "archiveNative": "ditto -c -k --keepParent jabgui/build/native/jabgui jabgui/build/native-dist/jabgui-native_macos-intel.zip"
+                "os": "ubuntu-22.04-arm",
+                "displayName": "linux-arm",
+                "archiveNative": "tar -c -C jabgui/build/native jabgui | gzip > jabgui/build/native-dist/jabgui-native_linux_arm64.tar.gz"
+              },
+              {
+                "os": "windows-latest",
+                "displayName": "windows-amd64",
+                "archiveNative": "7z a -r jabgui/build/native-dist/jabgui-native_windows.zip ./jabgui/build/native/jabgui"
+              },
+              {
+                "os": "macos-15",
+                "displayName": "macOS-silicon",
+                "archiveNative": "ditto -c -k --keepParent jabgui/build/native/jabgui jabgui/build/native-dist/jabgui-native_macos-silicon.zip"
               }
             ]
           }'
-          JABGUI_NATIVE_MATRIX_JSON="$(jq -c . <<<"$JABGUI_NATIVE_MATRIX_JSON")"
+
+          case "${{ github.event_name }}" in
+            schedule)
+              JABGUI_NATIVE_MATRIX_JSON="$(jq -c '.include |= map(select(.os == "macos-15"))' <<<"$JABGUI_NATIVE_MATRIX_JSON")"
+              ;;
+            workflow_dispatch)
+              JABGUI_NATIVE_MATRIX_JSON="$(jq -c . <<<"$JABGUI_NATIVE_MATRIX_JSON")"
+              ;;
+            *)
+              JABGUI_NATIVE_MATRIX_JSON="$(jq -c '.include |= map(select(.os != "macos-15"))' <<<"$JABGUI_NATIVE_MATRIX_JSON")"
+              ;;
+          esac
 
           echo "jabgui-native-matrix=$JABGUI_NATIVE_MATRIX_JSON" >> "$GITHUB_OUTPUT"
 
@@ -617,6 +649,8 @@ jobs:
     # TMP: only run jabgui-native on the fork
     if: false
     needs: [ compute-matrix, conditions, disk-space-check, flatpak-channel, pre-build ]
+    # The nightly run builds only the jabgui native binary for macOS
+    if: github.event_name != 'schedule'
     strategy:
       fail-fast: false
       matrix:
@@ -1045,6 +1079,8 @@ jobs:
     # TMP: only run jabgui-native on the fork
     if: false
     needs: [ compute-matrix, conditions, disk-space-check, pre-build ]
+    # The nightly run builds only the jabgui native binary for macOS
+    if: github.event_name != 'schedule'
     strategy:
       fail-fast: false
       matrix:
@@ -1078,7 +1114,7 @@ jobs:
       # jdk+fx maps to the Full Liberica package, used here for the AWT/java.desktop path triggered by PDFBox.
       - name: Set up Liberica NIK (native-image with AWT support)
         if: needs.conditions.outputs.should-build == 'true'
-        uses: graalvm/setup-graalvm@27b360dbb857524eaf0b4c4cef364d38e5b4f173 # v1
+        uses: graalvm/setup-graalvm@f70bc8032f90a104502824a54bcb94b6f01715bc # v1
         with:
           distribution: 'liberica'
           java-package: ${{ matrix.javaPackage }}
@@ -1171,9 +1207,9 @@ jobs:
         ${{ fromJSON(needs.compute-matrix.outputs.jabgui-native-matrix) }}
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.displayName }} jabgui native binary
-    # The build takes 15 to 25 minutes; on a runner that is short of memory it would otherwise hang for hours
-    # TMP: 360 (the GitHub maximum) to see whether the low-memory macOS build finishes at all
-    timeout-minutes: 360
+    # The build takes about 10 minutes on Linux and Windows, and 1 to 2 hours on the 7 GB macOS runner.
+    # On a runner that is short of memory it would otherwise hang for hours.
+    timeout-minutes: ${{ matrix.os == 'macos-15' && 180 || 60 }}
     steps:
       - name: Skip native binary build because it is not needed for this event
         if: needs.conditions.outputs.should-build != 'true'
@@ -1203,25 +1239,23 @@ jobs:
         if: ${{ needs.conditions.outputs.should-build == 'true' && runner.os == 'Linux' }}
         run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libxtst-dev libxxf86vm-dev libgl-dev xvfb openbox imagemagick
       - name: Build JabGui native binary
-        if: ${{ needs.conditions.outputs.should-build == 'true' && !matrix.lowMemory }}
+        if: ${{ needs.conditions.outputs.should-build == 'true' && runner.os != 'macOS' }}
         run: gradle :jabgui:nativeCompile
         env:
           VERSION: ${{ needs.pre-build.outputs.AssemblySemVer }}
           VERSION_INFO: ${{ needs.pre-build.outputs.InformationalVersion }}
-      # TMP: the macOS arm runner has 7 GB. Compile the Java code first, stop that Gradle daemon (up to 6 GB heap),
+      # The macOS runner has 7 GB. Compile the Java code first, stop that Gradle daemon (up to 6 GB heap),
       # then run nativeCompile with a small daemon so native-image gets most of the memory.
-      - name: Build JabGui native binary (macOS, low memory)
-        if: ${{ needs.conditions.outputs.should-build == 'true' && matrix.lowMemory }}
+      - name: Build JabGui native binary (macOS)
+        if: ${{ needs.conditions.outputs.should-build == 'true' && runner.os == 'macOS' }}
         run: |
-          sysctl hw.memsize
           gradle :jabgui:installDist
           gradle --stop
-          vm_stat | head -6
           gradle :jabgui:nativeCompile -Dorg.gradle.jvmargs=-Xmx1g
         env:
           VERSION: ${{ needs.pre-build.outputs.AssemblySemVer }}
           VERSION_INFO: ${{ needs.pre-build.outputs.InformationalVersion }}
-          NATIVE_IMAGE_OPTIONS: -J-Xmx6500m
+          NATIVE_IMAGE_OPTIONS: -J-Xmx5600m -Ob
 
       # Smoke test: start the binary with a test library, keep it running for a minute, take a screenshot and check the log
       - name: Prepare JabGui smoke test
@@ -1246,7 +1280,9 @@ jobs:
               echo "JabRef exited before the screenshot"
               exit 1
             fi
-            kill "$pid"
+            # Kill without a shutdown: xvfb-run removes the display right after this script, and a JavaFX shutdown
+            # without a display can log errors that the log check would report
+            kill -9 "$pid"
           '
       - name: Run JabGui smoke test (macOS)
         if: ${{ needs.conditions.outputs.should-build == 'true' && runner.os == 'macOS' }}
@@ -1328,6 +1364,9 @@ jobs:
         run: |
           echo "${{ secrets.buildJabRefPrivateKey }}" > sshkey
           chmod 600 sshkey
+      - name: Setup rsync (macOS)
+        if: ${{ needs.conditions.outputs.should-build == 'true' && (needs.disk-space-check.outputs.available == 'true') && (startsWith(matrix.os, 'macos')) }}
+        run: brew install rsync
       - name: Setup rsync (Windows)
         if: ${{ needs.conditions.outputs.should-build == 'true' && (needs.disk-space-check.outputs.available == 'true') && (matrix.os == 'windows-latest') }}
         # Same as in the build job: v6.4.5 misses "lib\rsync\tools\bin\ssh.exe"
