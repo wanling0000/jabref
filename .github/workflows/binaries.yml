@@ -522,10 +522,9 @@ jobs:
           JABGUI_NATIVE_MATRIX_JSON='{
             "include": [
               {
-                "os": "macos-15",
-                "displayName": "macOS-silicon",
-                "lowMemory": true,
-                "archiveNative": "ditto -c -k --keepParent jabgui/build/native/jabgui jabgui/build/native-dist/jabgui-native_macos-silicon.zip"
+                "os": "ubuntu-22.04",
+                "displayName": "linux-amd64",
+                "archiveNative": "tar -c -C jabgui/build/native jabgui | gzip > jabgui/build/native-dist/jabgui-native_linux.tar.gz"
               },
               {
                 "os": "ubuntu-22.04-arm",
@@ -646,11 +645,9 @@ jobs:
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
 
   build:
+    needs: [ compute-matrix, conditions, disk-space-check, flatpak-channel, pre-build ]
     # TMP: only run jabgui-native on the fork
     if: false
-    needs: [ compute-matrix, conditions, disk-space-check, flatpak-channel, pre-build ]
-    # The nightly run builds only the jabgui native binary for macOS
-    if: github.event_name != 'schedule'
     strategy:
       fail-fast: false
       matrix:
@@ -1076,11 +1073,9 @@ jobs:
             jrrsync@build-upload.jabref.org:/var/www/builds.jabref.org/www/${{ needs.pre-build.outputs.branch }}/${{ matrix.displayName }}/
 
   jabkit-native:
+    needs: [ compute-matrix, conditions, disk-space-check, pre-build ]
     # TMP: only run jabgui-native on the fork
     if: false
-    needs: [ compute-matrix, conditions, disk-space-check, pre-build ]
-    # The nightly run builds only the jabgui native binary for macOS
-    if: github.event_name != 'schedule'
     strategy:
       fail-fast: false
       matrix:
