@@ -1244,9 +1244,25 @@ jobs:
       - name: Build JabGui native binary (macOS)
         if: ${{ needs.conditions.outputs.should-build == 'true' && runner.os == 'macOS' }}
         run: |
+          # TMP: memory diagnostics
+          memdiag() {
+            echo "===== MEMDIAG $1 $(date -u +%H:%M:%S) ====="
+            sysctl -n vm.swapusage
+            memory_pressure | tail -1
+            vm_stat | grep -E 'free|active|inactive|wired|compressor|Swapins|Swapouts'
+            top -l 1 -o mem -n 8 -stats pid,command,mem,cmprs | tail -9
+          }
+          echo "hw.memsize: $(sysctl -n hw.memsize)"
+          memdiag start
           gradle :jabgui:installDist
+          memdiag after-installDist
           gradle --stop
+          memdiag after-gradle-stop
+          (while true; do sleep 120; memdiag sample; done) &
+          SAMPLER=$!
           gradle :jabgui:nativeCompile -Dorg.gradle.jvmargs=-Xmx1g
+          kill $SAMPLER
+          memdiag end
         env:
           VERSION: ${{ needs.pre-build.outputs.AssemblySemVer }}
           VERSION_INFO: ${{ needs.pre-build.outputs.InformationalVersion }}
