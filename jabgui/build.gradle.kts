@@ -431,6 +431,8 @@ val nativeImageFeatures = sourceSets.create("nativeImageFeatures")
 dependencies {
     "nativeImageFeaturesCompileOnly"("org.graalvm.sdk:nativeimage")
     "nativeImageFeaturesCompileOnly"("org.jspecify:jspecify")
+    // TMP experiment: @TargetClass/@Substitute for the DJL substitution
+    "nativeImageFeaturesCompileOnly"("org.graalvm.nativeimage:svm")
 }
 
 graalvmNative {
@@ -438,6 +440,8 @@ graalvmNative {
         named("main") {
             classpath(nativeImageOnly, nativeImageFeatures.output)
             buildArgs.add("--features=org.jabref.nativeimage.JabRefViewsFeature")
+            // TMP experiment: the substitution class uses the builder's annotation package
+            buildArgs.add("--add-exports=org.graalvm.nativeimage.builder/com.oracle.svm.core.annotate=ALL-UNNAMED")
             imageName.set("jabref")
             mainClass.set("org.jabref.Launcher")
             resources {
