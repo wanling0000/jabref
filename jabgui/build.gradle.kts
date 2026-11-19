@@ -433,18 +433,6 @@ dependencies {
     "nativeImageFeaturesCompileOnly"("org.jspecify:jspecify")
 }
 
-// TMP experiment: leave the AI libraries out of the runtime classpath to measure their native-image cost
-configurations.matching { it.name == "runtimeClasspath" || it.name == "nativeImageClasspath" }.configureEach {
-    exclude(group = "ai.djl", module = "api")
-    exclude(group = "ai.djl.pytorch", module = "pytorch-engine")
-    exclude(group = "ai.djl.pytorch", module = "pytorch-model-zoo")
-    exclude(group = "ai.djl.huggingface", module = "tokenizers")
-    exclude(group = "dev.langchain4j", module = "langchain4j")
-    exclude(group = "dev.langchain4j", module = "langchain4j-core")
-    exclude(group = "io.github.stefanbratanov", module = "jvm-openai")
-    exclude(group = "com.knuddels", module = "jtokkit")
-}
-
 graalvmNative {
     binaries {
         named("main") {

@@ -1204,7 +1204,6 @@ jobs:
     name: ${{ matrix.displayName }} jabgui native binary
     # The build takes about 10 minutes on Linux and Windows, and 1 to 2 hours on the 7 GB macOS runner.
     # On a runner that is short of memory it would otherwise hang for hours.
-    timeout-minutes: ${{ matrix.os == 'macos-15' && 180 || 60 }}
     steps:
       - name: Skip native binary build because it is not needed for this event
         if: needs.conditions.outputs.should-build != 'true'
