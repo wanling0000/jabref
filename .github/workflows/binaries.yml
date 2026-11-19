@@ -1265,7 +1265,7 @@ jobs:
         env:
           VERSION: ${{ needs.pre-build.outputs.AssemblySemVer }}
           VERSION_INFO: ${{ needs.pre-build.outputs.InformationalVersion }}
-          NATIVE_IMAGE_OPTIONS: -J-Xmx5600m -Ob
+          NATIVE_IMAGE_OPTIONS: -J-Xmx5600m -Ob -H:DeadlockWatchdogInterval=0
 
       # Smoke test: start the binary with a test library, keep it running for a minute, take a screenshot and check the log
       - name: Prepare JabGui smoke test
