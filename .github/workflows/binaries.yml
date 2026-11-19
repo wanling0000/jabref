@@ -549,7 +549,8 @@ jobs:
               JABGUI_NATIVE_MATRIX_JSON="$(jq -c '.include |= map(select(.os == "macos-15"))' <<<"$JABGUI_NATIVE_MATRIX_JSON")"
               ;;
             workflow_dispatch)
-              JABGUI_NATIVE_MATRIX_JSON="$(jq -c . <<<"$JABGUI_NATIVE_MATRIX_JSON")"
+              # TMP: Linux only, for the AI method breakdown
+              JABGUI_NATIVE_MATRIX_JSON="$(jq -c '.include |= map(select(.os == "ubuntu-22.04"))' <<<"$JABGUI_NATIVE_MATRIX_JSON")"
               ;;
             *)
               JABGUI_NATIVE_MATRIX_JSON="$(jq -c '.include |= map(select(.os != "macos-15"))' <<<"$JABGUI_NATIVE_MATRIX_JSON")"
@@ -1238,6 +1239,15 @@ jobs:
         env:
           VERSION: ${{ needs.pre-build.outputs.AssemblySemVer }}
           VERSION_INFO: ${{ needs.pre-build.outputs.InformationalVersion }}
+          # TMP: write the list of reachable methods and the call tree to build/native/nativeCompile/reports
+          NATIVE_IMAGE_OPTIONS: -H:PrintAnalysisCallTreeType=CSV
+      - name: TMP upload native-image analysis reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: jabgui-native-reports
+          path: jabgui/build/native/nativeCompile/reports/
+          if-no-files-found: warn
       # The macOS runner has 7 GB. Compile the Java code first, stop that Gradle daemon (up to 6 GB heap),
       # then run nativeCompile with a small daemon so native-image gets most of the memory.
       - name: Build JabGui native binary (macOS)
