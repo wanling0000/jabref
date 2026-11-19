@@ -438,6 +438,8 @@ graalvmNative {
         named("main") {
             classpath(nativeImageOnly, nativeImageFeatures.output)
             buildArgs.add("--features=org.jabref.nativeimage.JabRefViewsFeature")
+            // TMP experiment: keep javac (pulled in through DJL's ToolProvider lookup) out of the image
+            buildArgs.add("-H:ServiceLoaderFeatureExcludeServices=javax.tools.JavaCompiler")
             imageName.set("jabref")
             mainClass.set("org.jabref.Launcher")
             resources {
